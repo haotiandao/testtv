@@ -4,6 +4,7 @@ import requests
 import time
 import concurrent.futures
 import subprocess
+import socket  # 添加缺失的导入
 from datetime import datetime, timezone, timedelta
 
 # ===============================
@@ -37,7 +38,15 @@ CHANNEL_CATEGORIES = {
         "新疆卫视", "西藏卫视", "三沙卫视", "兵团卫视", "延边卫视", "安多卫视", "康巴卫视", "农林卫视", "山东教育卫视",
         "中国教育1台", "中国教育2台", "中国教育3台", "中国教育4台", "早期教育"
     ],
-    #任意添加，与仓库中rtp/省份运营商.txt内频道一致即可，或在下方频道名映射中改名
+    "数字频道": [
+        "CHC动作电影", "CHC家庭影院", "CHC影迷电影", "淘电影", "淘精彩", "淘剧场", "淘4K", "淘娱乐", "淘BABY", "淘萌宠", "重温经典",
+        "星空卫视", "ChannelV", "凤凰卫视中文台", "凤凰卫视资讯台", "凤凰卫视香港台", "凤凰卫视电影台", "求索纪录", "求索科学",
+        "求索生活", "求索动物", "纪实人文", "金鹰纪实", "纪实科教", "睛彩青少", "睛彩竞技", "睛彩篮球", "睛彩广场舞", "魅力足球", "五星体育",
+        "劲爆体育", "快乐垂钓", "茶频道", "先锋乒羽", "天元围棋", "汽摩", "梨园频道", "文物宝库", "武术世界", "哒啵赛事", "哒啵电竞", "黑莓电影", "黑莓动画", 
+        "乐游", "生活时尚", "都市剧场", "欢笑剧场", "游戏风云", "金色学堂", "动漫秀场", "新动漫", "卡酷少儿", "金鹰卡通", "优漫卡通", "哈哈炫动", "嘉佳卡通", 
+        "中国交通", "中国天气", "华数4K", "华数星影", "华数动作影院", "华数喜剧影院", "华数家庭影院", "华数经典电影", "华数热播剧场", "华数碟战剧场",
+        "华数军旅剧场", "华数城市剧场", "华数武侠剧场", "华数古装剧场", "华数魅力时尚", "华数少儿动画", "华数动画"
+    ],
 }
 
 # ===== 映射（别名 -> 标准名） =====
@@ -64,6 +73,19 @@ CHANNEL_MAPPING = {
     "CCTV17": ["CCTV-17", "CCTV-17 HD", "CCTV17 HD", "CCTV-17农业农村"],
     "CCTV4K": ["CCTV4K超高清", "CCTV-4K超高清", "CCTV-4K 超高清", "CCTV 4K"],
     "CCTV8K": ["CCTV8K超高清", "CCTV-8K超高清", "CCTV-8K 超高清", "CCTV 8K"],
+    "兵器科技": ["CCTV-兵器科技", "CCTV兵器科技"],
+    "风云音乐": ["CCTV-风云音乐", "CCTV风云音乐"],
+    "第一剧场": ["CCTV-第一剧场", "CCTV第一剧场"],
+    "风云足球": ["CCTV-风云足球", "CCTV风云足球"],
+    "风云剧场": ["CCTV-风云剧场", "CCTV风云剧场"],
+    "怀旧剧场": ["CCTV-怀旧剧场", "CCTV怀旧剧场"],
+    "女性时尚": ["CCTV-女性时尚", "CCTV女性时尚"],
+    "世界地理": ["CCTV-世界地理", "CCTV世界地理"],
+    "央视台球": ["CCTV-央视台球", "CCTV央视台球"],
+    "高尔夫网球": ["CCTV-高尔夫网球", "CCTV高尔夫网球", "CCTV央视高网", "CCTV-高尔夫·网球", "央视高网"],
+    "央视文化精品": ["CCTV-央视文化精品", "CCTV央视文化精品", "CCTV文化精品", "CCTV-文化精品", "文化精品"],
+    "卫生健康": ["CCTV-卫生健康", "CCTV卫生健康"],
+    "电视指南": ["CCTV-电视指南", "CCTV电视指南"],
     "农林卫视": ["陕西农林卫视"],
     "三沙卫视": ["海南三沙卫视"],
     "兵团卫视": ["新疆兵团卫视"],
@@ -84,8 +106,48 @@ CHANNEL_MAPPING = {
     "山东卫视": ["山东卫视4K"],
     "四川卫视": ["四川卫视4K"],
     "浙江卫视": ["浙江卫视4K"],
+    "CHC影迷电影": ["CHC高清电影", "CHC-影迷电影", "影迷电影", "chc高清电影"],
+    "淘电影": ["IPTV淘电影", "北京IPTV淘电影", "北京淘电影"],
+    "淘精彩": ["IPTV淘精彩", "北京IPTV淘精彩", "北京淘精彩"],
+    "淘剧场": ["IPTV淘剧场", "北京IPTV淘剧场", "北京淘剧场"],
+    "淘4K": ["IPTV淘4K", "北京IPTV4K超清", "北京淘4K", "淘4K", "淘 4K"],
+    "淘娱乐": ["IPTV淘娱乐", "北京IPTV淘娱乐", "北京淘娱乐"],
+    "淘BABY": ["IPTV淘BABY", "北京IPTV淘BABY", "北京淘BABY", "IPTV淘baby", "北京IPTV淘baby", "北京淘baby"],
+    "淘萌宠": ["IPTV淘萌宠", "北京IPTV萌宠TV", "北京淘萌宠"],
+    "魅力足球": ["上海魅力足球"],
+    "睛彩青少": ["睛彩羽毛球"],
+    "求索纪录": ["求索记录", "求索纪录4K", "求索记录4K", "求索纪录 4K", "求索记录 4K"],
+    "金鹰纪实": ["湖南金鹰纪实", "金鹰记实"],
+    "纪实科教": ["北京纪实科教", "BRTV纪实科教", "纪实科教8K"],
+    "星空卫视": ["星空衛視", "星空衛视", "星空卫視"],
+    "ChannelV": ["CHANNEL-V", "Channel[V]"],
+    "凤凰卫视中文台": ["凤凰中文", "凤凰中文台", "凤凰卫视中文", "凤凰卫视"],
+    "凤凰卫视香港台": ["凤凰香港台", "凤凰卫视香港", "凤凰香港"],
+    "凤凰卫视资讯台": ["凤凰资讯", "凤凰资讯台", "凤凰咨询", "凤凰咨询台", "凤凰卫视咨询台", "凤凰卫视资讯", "凤凰卫视咨询"],
+    "凤凰卫视电影台": ["凤凰电影", "凤凰电影台", "凤凰卫视电影", "鳳凰衛視電影台", " 凤凰电影"],
+    "茶频道": ["湖南茶频道"],
+    "快乐垂钓": ["湖南快乐垂钓"],
+    "先锋乒羽": ["湖南先锋乒羽"],
+    "天元围棋": ["天元围棋频道"],
+    "汽摩": ["重庆汽摩", "汽摩频道", "重庆汽摩频道"],
+    "梨园频道": ["河南梨园频道", "梨园", "河南梨园"],
+    "文物宝库": ["河南文物宝库"],
+    "武术世界": ["河南武术世界"],
+    "乐游": ["乐游频道", "上海乐游频道", "乐游纪实", "SiTV乐游频道", "SiTV 乐游频道"],
+    "欢笑剧场": ["上海欢笑剧场4K", "欢笑剧场 4K", "欢笑剧场4K", "上海欢笑剧场"],
+    "生活时尚": ["生活时尚4K", "SiTV生活时尚", "上海生活时尚"],
+    "都市剧场": ["都市剧场4K", "SiTV都市剧场", "上海都市剧场"],
+    "游戏风云": ["游戏风云4K", "SiTV游戏风云", "上海游戏风云"],
+    "金色学堂": ["金色学堂4K", "SiTV金色学堂", "上海金色学堂"],
+    "动漫秀场": ["动漫秀场4K", "SiTV动漫秀场", "上海动漫秀场"],
+    "卡酷少儿": ["北京KAKU少儿", "BRTV卡酷少儿", "北京卡酷少儿", "卡酷动画"],
+    "哈哈炫动": ["炫动卡通", "上海哈哈炫动"],
+    "优漫卡通": ["江苏优漫卡通", "优漫漫画"],
+    "金鹰卡通": ["湖南金鹰卡通"],
+    "中国交通": ["中国交通频道"],
+    "中国天气": ["中国天气频道"],
     "华数4K": ["华数低于4K", "华数4K电影", "华数爱上4K"],
-}#格式为"频道分类中的标准名": ["rtp/中的名字"],
+}
 
 # ===============================
 def get_run_count():
@@ -103,6 +165,20 @@ def save_run_count(count):
     except Exception as e:
         print(f"⚠️ 写计数文件失败：{e}")
 
+def clean_ip_directory():
+    """清空ip目录下的所有txt文件"""
+    if os.path.exists(IP_DIR):
+        cleaned = 0
+        for file in os.listdir(IP_DIR):
+            if file.endswith('.txt'):
+                os.remove(os.path.join(IP_DIR, file))
+                cleaned += 1
+        if cleaned > 0:
+            print(f"🗑️ 已清空 ip 目录，删除了 {cleaned} 个文件")
+        else:
+            print("ℹ️ ip 目录已为空")
+    else:
+        print("ℹ️ ip 目录不存在，无需清空")
 
 # ===============================
 def get_isp_from_api(data):
@@ -117,23 +193,23 @@ def get_isp_from_api(data):
 
     return "未知"
 
-
 def get_isp_by_regex(ip):
+    """根据IP段判断运营商 - 修正版"""
+    # 电信IP段
     if re.match(r"^(1[0-9]{2}|2[0-3]{2}|42|43|58|59|60|61|110|111|112|113|114|115|116|117|118|119|120|121|122|123|124|125|126|127|175|180|182|183|184|185|186|187|188|189|223)\.", ip):
         return "电信"
-
-    elif re.match(r"^(42|43|58|59|60|61|110|111|112|113|114|115|116|117|118|119|120|121|122|123|124|125|126|127|175|180|182|183|184|185|186|187|188|189|223)\.", ip):
+    # 联通IP段（修正：使用不同的IP段）
+    elif re.match(r"^(8|9|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|33|34|35|40|41|44|45|46|47|48|49|50|51|52|53|54|55|56|57|62|63|64|65|66|67|68|69|70|71|72|73|74|75|76|77|78|79|80|81|82|83|84|85|86|87|88|89|90|91|92|93|94|95|96|97|98|99|100|101|102|103|104|105|106|107|108|109|128|129|130|131|132|133|140|141|142|143|144|145|146|147|148|149|150|151|152|153|154|155|156|157|158|159|160|161|162|163|164|165|166|167|168|169|170|171|172|173|174|176|177|178|179|190|191|192|193|194|195|196|197|198|199|200|201|202|203|204|205|206|207|208|209|210|211|212|213|214|215|216|217|218|219|220|221|222)\.", ip):
         return "联通"
-
-    elif re.match(r"^(223|36|37|38|39|100|101|102|103|104|105|106|107|108|109|134|135|136|137|138|139|150|151|152|157|158|159|170|178|182|183|184|187|188|189)\.", ip):
+    # 移动IP段
+    elif re.match(r"^(36|37|38|39|100|101|102|103|104|105|106|107|108|109|134|135|136|137|138|139|150|151|152|157|158|159|170|178|182|183|184|187|188|189)\.", ip):
         return "移动"
-
     return "未知"
-
 
 # ===============================
 # 第一阶段
 def first_stage():
+    """第一阶段：抓取IP并分类保存"""
     os.makedirs(IP_DIR, exist_ok=True)
     all_ips = set()
 
@@ -146,6 +222,10 @@ def first_stage():
         except Exception as e:
             print(f"❌ 爬取失败：{e}")
         time.sleep(3)
+
+    if not all_ips:
+        print("⚠️ 未获取到任何IP")
+        return
 
     province_isp_dict = {}
 
@@ -195,7 +275,7 @@ def first_stage():
             with open(path, "a", encoding="utf-8") as f:
                 for ip_port in sorted(ip_set):
                     f.write(ip_port + "\n")
-            print(f"{path} 已追加写入 {len(ip_set)} 个 IP")
+            print(f"✅ {path} 已追加写入 {len(ip_set)} 个 IP")
         except Exception as e:
             print(f"❌ 写入 {path} 失败：{e}")
 
@@ -206,16 +286,18 @@ def first_stage():
 # ===============================
 # 第二阶段
 def second_stage():
+    """第二阶段：合并IP和RTP生成zubo.txt"""
     print("🔔 第二阶段触发：生成 zubo.txt")
     if not os.path.exists(IP_DIR):
         print("⚠️ ip 目录不存在，跳过第二阶段")
         return
 
-    combined_lines = []
-
     if not os.path.exists(RTP_DIR):
         print("⚠️ rtp 目录不存在，无法进行第二阶段组合，跳过")
         return
+
+    combined_lines = []
+    matched_files = 0
 
     for ip_file in os.listdir(IP_DIR):
         if not ip_file.endswith(".txt"):
@@ -227,6 +309,8 @@ def second_stage():
         if not os.path.exists(rtp_path):
             continue
 
+        matched_files += 1
+        
         try:
             with open(ip_path, encoding="utf-8") as f1, open(rtp_path, encoding="utf-8") as f2:
                 ip_lines = [x.strip() for x in f1 if x.strip()]
@@ -236,8 +320,11 @@ def second_stage():
             continue
 
         if not ip_lines or not rtp_lines:
+            print(f"⚠️ {ip_file} 中IP或RTP为空，跳过")
             continue
 
+        print(f"🔄 合并 {ip_file}：{len(ip_lines)} 个IP × {len(rtp_lines)} 个频道")
+        
         for ip_port in ip_lines:
             for rtp_line in rtp_lines:
                 if "," not in rtp_line:
@@ -248,12 +335,15 @@ def second_stage():
                 if "rtp://" in rtp_url:
                     part = rtp_url.split("rtp://", 1)[1]
                     combined_lines.append(f"{ch_name},http://{ip_port}/rtp/{part}")
-
                 elif "udp://" in rtp_url:
                     part = rtp_url.split("udp://", 1)[1]
                     combined_lines.append(f"{ch_name},http://{ip_port}/udp/{part}")
 
-    # 去重
+    if matched_files == 0:
+        print("⚠️ 没有找到匹配的IP和RTP文件")
+        return
+
+    # 去重（按URL去重）
     unique = {}
     for line in combined_lines:
         url_part = line.split(",", 1)[1]
@@ -264,7 +354,7 @@ def second_stage():
         with open(ZUBO_FILE, "w", encoding="utf-8") as f:
             for line in unique.values():
                 f.write(line + "\n")
-        print(f"🎯 第二阶段完成，写入 {len(unique)} 条记录")
+        print(f"🎯 第二阶段完成，匹配 {matched_files} 个文件，生成 {len(unique)} 条去重记录")
     except Exception as e:
         print(f"❌ 写文件失败：{e}")
 
@@ -272,6 +362,7 @@ def second_stage():
 # ===============================
 # 第三阶段
 def third_stage():
+    """第三阶段：检测可用IP并生成IPTV.txt"""
     print("🧩 第三阶段：多线程检测代表频道生成 IPTV.txt 并写回可用 IP 到 ip/目录（覆盖）")
 
     if not os.path.exists(ZUBO_FILE):
@@ -314,41 +405,54 @@ def third_stage():
 
     # 读取 zubo.txt 并按 ip:port 分组
     groups = {}
-    with open(ZUBO_FILE, encoding="utf-8") as f:
-        for line in f:
-            if "," not in line:
-                continue
+    try:
+        with open(ZUBO_FILE, encoding="utf-8") as f:
+            for line in f:
+                if "," not in line:
+                    continue
 
-            ch_name, url = line.strip().split(",", 1)
-            ch_main = alias_map.get(ch_name, ch_name)
-            m = re.match(r"http://([^/]+)/", url)
-            if not m:
-                continue
+                ch_name, url = line.strip().split(",", 1)
+                ch_main = alias_map.get(ch_name, ch_name)
+                m = re.match(r"http://([^/]+)/", url)
+                if not m:
+                    continue
 
-            ip_port = m.group(1)
+                ip_port = m.group(1)
+                groups.setdefault(ip_port, []).append((ch_main, url))
+    except Exception as e:
+        print(f"❌ 读取 zubo.txt 失败：{e}")
+        return
 
-            groups.setdefault(ip_port, []).append((ch_main, url))
+    if not groups:
+        print("⚠️ zubo.txt 中没有有效的IP和URL")
+        return
 
     # 选择代表频道并检测
     def detect_ip(ip_port, entries):
+        # 优先检测CCTV1，如果没有则检测第一个频道
         rep_channels = [u for c, u in entries if c == "CCTV1"]
         if not rep_channels and entries:
             rep_channels = [entries[0][1]]
-        playable = any(check_stream(u) for u in rep_channels)
+        playable = any(check_stream(u) for u in rep_channels[:3])  # 最多检测3个
         return ip_port, playable
 
     print(f"🚀 启动多线程检测（共 {len(groups)} 个 IP）...")
     playable_ips = set()
+    
     with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
         futures = {executor.submit(detect_ip, ip, chs): ip for ip, chs in groups.items()}
+        completed = 0
         for future in concurrent.futures.as_completed(futures):
+            completed += 1
+            if completed % 10 == 0:
+                print(f"⏳ 检测进度：{completed}/{len(groups)}")
             try:
                 ip_port, ok = future.result()
+                if ok:
+                    playable_ips.add(ip_port)
             except Exception as e:
                 print(f"⚠️ 线程检测返回异常：{e}")
                 continue
-            if ok:
-                playable_ips.add(ip_port)
 
     print(f"✅ 检测完成，可播放 IP 共 {len(playable_ips)} 个")
 
@@ -367,6 +471,7 @@ def third_stage():
 
                 operator_playable_ips.setdefault(operator, set()).add(ip_port)
 
+    # 写回可用IP到ip目录（覆盖）
     for operator, ip_set in operator_playable_ips.items():
         target_file = os.path.join(IP_DIR, operator + ".txt")
         try:
@@ -389,12 +494,16 @@ def third_stage():
 
             for category, ch_list in CHANNEL_CATEGORIES.items():
                 f.write(f"{category},#genre#\n")
+                matched_count = 0
                 for ch in ch_list:
                     for line in valid_lines:
                         name = line.split(",", 1)[0]
                         if name == ch:
                             f.write(line + "\n")
-                f.write("\n")
+                            matched_count += 1
+                            break
+                if matched_count > 0:
+                    f.write("\n")
         print(f"🎯 IPTV.txt 生成完成，共 {len(valid_lines)} 条频道")
     except Exception as e:
         print(f"❌ 写 IPTV.txt 失败：{e}")
@@ -411,8 +520,9 @@ def push_all_files():
 
     os.system("git add 计数.txt || true")
     os.system("git add ip/*.txt || true")
+    os.system("git add zubo.txt || true")  # 添加zubo.txt
     os.system("git add IPTV.txt || true")
-    os.system('git commit -m "自动更新：计数、IP文件、IPTV.txt" || echo "⚠️ 无需提交"')
+    os.system('git commit -m "自动更新：计数、IP文件、zubo.txt、IPTV.txt" || echo "⚠️ 无需提交"')
     os.system("git push origin main || echo '⚠️ 推送失败'")
 
 # ===============================
@@ -422,12 +532,25 @@ if __name__ == "__main__":
     os.makedirs(IP_DIR, exist_ok=True)
     os.makedirs(RTP_DIR, exist_ok=True)
 
+    # 获取当前计数
+    current_count = get_run_count()
+    
+    # 检查是否需要清空（每24小时清空一次，假设每20分钟运行一次，24小时=72次）
+    if current_count >= 72:
+        clean_ip_directory()
+        save_run_count(0)  # 重置计数
+        current_count = 0
+
+    # 执行第一阶段
     run_count = first_stage()
 
+    # 判断是否触发第二、三阶段（10的倍数）
     if run_count % 10 == 0:
+        print(f"🎯 达到触发条件（{run_count} 是 10 的倍数），执行第二、三阶段")
         second_stage()
         third_stage()
     else:
-        print("ℹ️ 本次不是 10 的倍数，跳过第二、三阶段")
+        print(f"ℹ️ 当前计数 {run_count}，不是 10 的倍数，跳过第二、三阶段")
 
+    # 推送文件
     push_all_files()
