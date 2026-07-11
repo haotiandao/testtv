@@ -4,7 +4,7 @@ import requests
 import time
 import concurrent.futures
 import subprocess
-import socket  # 添加缺失的导入
+import socket
 from datetime import datetime, timezone, timedelta
 
 # ===============================
@@ -225,7 +225,7 @@ def first_stage():
 
     if not all_ips:
         print("⚠️ 未获取到任何IP")
-        return
+        return 0  # 返回0而不是None
 
     province_isp_dict = {}
 
@@ -269,6 +269,7 @@ def first_stage():
     count = get_run_count() + 1
     save_run_count(count)
 
+    total_ips = 0
     for filename, ip_set in province_isp_dict.items():
         path = os.path.join(IP_DIR, filename)
         try:
@@ -276,10 +277,11 @@ def first_stage():
                 for ip_port in sorted(ip_set):
                     f.write(ip_port + "\n")
             print(f"✅ {path} 已追加写入 {len(ip_set)} 个 IP")
+            total_ips += len(ip_set)
         except Exception as e:
             print(f"❌ 写入 {path} 失败：{e}")
 
-    print(f"✅ 第一阶段完成，当前轮次：{count}")
+    print(f"✅ 第一阶段完成，当前轮次：{count}，共写入 {total_ips} 个IP")
     return count
 
 
@@ -520,7 +522,7 @@ def push_all_files():
 
     os.system("git add 计数.txt || true")
     os.system("git add ip/*.txt || true")
-    os.system("git add zubo.txt || true")  # 添加zubo.txt
+    os.system("git add zubo.txt || true")
     os.system("git add IPTV.txt || true")
     os.system('git commit -m "自动更新：计数、IP文件、zubo.txt、IPTV.txt" || echo "⚠️ 无需提交"')
     os.system("git push origin main || echo '⚠️ 推送失败'")
@@ -543,14 +545,18 @@ if __name__ == "__main__":
 
     # 执行第一阶段
     run_count = first_stage()
+    
+    # 确保run_count是整数
+    if run_count is None:
+        run_count = 0
 
     # 判断是否触发第二、三阶段（10的倍数）
-    if run_count % 10 == 0:
+    if run_count > 0 and run_count % 10 == 0:
         print(f"🎯 达到触发条件（{run_count} 是 10 的倍数），执行第二、三阶段")
         second_stage()
         third_stage()
     else:
-        print(f"ℹ️ 当前计数 {run_count}，不是 10 的倍数，跳过第二、三阶段")
+        print(f"ℹ️ 当前计数 {run_count}，不是 10 的倍数或未获取到IP，跳过第二、三阶段")
 
     # 推送文件
     push_all_files()
