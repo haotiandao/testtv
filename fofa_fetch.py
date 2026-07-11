@@ -568,7 +568,7 @@ def push_all_files():
     os.system("git add zubo.txt || true")
     os.system("git add IPTV.txt || true")
     os.system('git commit -m "自动更新：16KB深度测流，过滤无效IP" || echo "⚠️ 无需提交"')
-    os.system("git push origin main || echo "⚠️ 推送失败"")
+    os.system('git push origin main || echo "⚠️ 推送失败"')
 
 
 # ===============================
