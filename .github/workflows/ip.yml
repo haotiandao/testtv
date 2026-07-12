@@ -2,7 +2,7 @@ name: Auto Run IPTV Script
 
 on:
   schedule:
-    - cron: '*/20 * * * *'  # 每20分钟运行一次
+    - cron: '0 0 * * *'  # 每20分钟运行一次
   workflow_dispatch:        # 支持手动触发
 
 # ==================== 关键权限配置 ====================
